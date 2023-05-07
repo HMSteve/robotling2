@@ -38,7 +38,9 @@ if __name__ == "__main__":
       if Robot.is_pressed_A:
         break
       time.sleep_ms(25)
-
+      
+ 
+        
   # Main loop
   glb.toLog("Starting main loop (press `X` to shutdown)")
   try:
@@ -64,6 +66,19 @@ if __name__ == "__main__":
         clfL = dL > DIST_TOF_CLIFF
         clfR = dR > DIST_TOF_CLIFF
         free = not objL and not objR and not objC and not clfL and not clfR
+
+      elif Robot.distance_sensor_type == cfg.STY_VL53L0X:
+        dL, dC, dR = Robot.distances_mm
+        #print(dL, dC, dR)
+        objL = (dL > 0 and dL < DIST_TOF_OBJ)
+        objC = (dC > 0 and dC < DIST_TOF_OBJ)
+        objR = (dR > 0 and dR < DIST_TOF_OBJ)
+        clfL = dL > DIST_TOF_CLIFF
+        clfR = dR > DIST_TOF_CLIFF
+        free = not objL and not objR and not objC and not clfL and not clfR
+
+      elif Robot.distance_sensor_type == cfg.STY_NONE:
+        free = True        
 
       if only_sensors:
         # If only testing sensors, skip rest of main loop

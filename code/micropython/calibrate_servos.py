@@ -20,7 +20,8 @@ SRV_MAX_US     = const(2300)
 # Robotling 2
 SRV_ID         = bytearray([0,1,2])
 SRV_PIN        = bytearray([board.D21, board.D10, board.D2])
-SRV_RANGE_US   = [(1110, 1810), (1100, 1800), (1291, 1565)]
+#SRV_RANGE_US   = [(1110, 1810), (1100, 1800), (1291, 1565)]
+SRV_RANGE_US   = [(1100, 1800), (1030, 1730), (1391, 1565)]
 SRV_RANGE_DEG  = [(-40, 40), (-40, 40), (-20, 20)]
 '''
 SRV_RANGE_US   = [(1010, 1810), (1100, 1900), (1191, 1625)]

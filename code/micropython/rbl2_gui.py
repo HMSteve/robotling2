@@ -171,6 +171,11 @@ class GUI(object):
     """ Show distance info from 3-channel tof sensor array
     """
     self._show_dist(dist, cfg.TOFPWM_MIN_MM, cfg.TOFPWM_MAX_MM)
+    
+  def show_distance_vl53l0x(self, dist):
+    """ Show distance info from 3-channel VL53L0X tof sensor array
+    """
+    self._show_dist(dist, cfg.TOF_MIN_MM, cfg.TOF_MAX_MM)    
 
   def _show_dist(self, dist, dmin, dmax):
     """ Show distance

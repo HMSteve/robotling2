@@ -10,34 +10,38 @@
 # 2022-04-08, v1.2, small fixes for MicroPython 1.18
 # ----------------------------------------------------------------------------
 import time
+import utime
 import array
-from machine import Pin, ADC
+from machine import Pin, ADC, I2C
 import rbl2_config as cfg
 import rbl2_global as glb
 import rbl2_gait as gait
 import rbl2_gui
 from robotling_lib.platform.rp2 import board_rp2 as board
+from vl53l0x import setup_tofl_device, TBOOT
 from robotling_lib.misc.helpers import timed_function
+
 
 # pylint: disable=bad-whitespace
 __version__  = "0.1.3.0"
 
 # Global variables to communicate with task on core 1
 # (Do not access other than via the `RobotBase` instance!!)
-g_state_gait = glb.STATE_NONE
-g_state      = glb.STATE_NONE
-g_cmd        = glb.CMD_NONE
-g_counter    = 0
-g_gui        = None
-g_dist_evo   = None
-g_dist_tof   = None
-g_dist_type  = cfg.STY_NONE
-g_gait       = None
-g_move_dir   = 0.
-g_move_vel   = 2
-g_move_rev   = False
-g_do_exit    = False
-g_led        = Pin(board.D11, Pin.OUT)
+g_state_gait   = glb.STATE_NONE
+g_state        = glb.STATE_NONE
+g_cmd          = glb.CMD_NONE
+g_counter      = 0
+g_gui          = None
+g_dist_evo     = None
+g_dist_tof     = None
+g_dist_vl53l0x = None
+g_dist_type    = cfg.STY_NONE
+g_gait         = None
+g_move_dir     = 0.
+g_move_vel     = 2
+g_move_rev     = False
+g_do_exit      = False
+g_led          = Pin(board.D11, Pin.OUT)
 # pylint: enable=bad-whitespace
 
 # ----------------------------------------------------------------------------
@@ -46,7 +50,8 @@ class Robot(object):
 
   def __init__(self, core=1, use_gui=True, verbose=False, no_servos=False):
     global g_state, g_gui, g_gait
-    global g_dist_evo, g_dist_tof, g_dist_type
+    global g_dist_evo, g_dist_tof, g_dist_vl53l0x, g_dist_type
+    global tofl0, tofl1, tofl2    
 
     # Initializing ...
     glb.toLog("Initializing ...")
@@ -99,6 +104,63 @@ class Robot(object):
         from robotling_lib.sensors.pololu_tof_ranging import PololuTOFRangingSensor
         for p in cfg.TOFPWM_PINS:
           g_dist_tof.append(PololuTOFRangingSensor(p))
+     
+
+    if "tof_vl53l0x" in cfg.DEVICES:
+        g_dist_type = cfg.STY_VL53L0X
+        g_dist_vl53l0x = []        
+        device_1_xshut = Pin(cfg.TOFL_SHUT_1, Pin.OUT)
+        device_2_xshut = Pin(cfg.TOFL_SHUT_2, Pin.OUT)
+        device_1_xshut.value(1)
+        device_2_xshut.value(1)
+        utime.sleep_us (TBOOT)
+        i2c = I2C(id=cfg.TOFL_I2C, sda=Pin(cfg.TOFL_SDA), scl=Pin(cfg.TOFL_SCL))
+
+        addresses =i2c.scan()
+        if (not (0x31 in addresses)):
+            print("Setting up device 0")
+            device_1_xshut.value(0)
+            device_2_xshut.value(0)
+            tofl0 = setup_tofl_device(i2c, 40000, 12, 8)
+            tofl0.set_address(0x31)
+        else:
+            print("Reconnect device 0")
+            device_1_xshut.value(0)
+            device_2_xshut.value(0)
+            tofl0 = setup_tofl_device(i2c, 40000, 12, 8, 0x31)
+
+        if (not (0x33 in addresses)):
+            print("Setting up device 1")
+            device_1_xshut.value(1)
+            device_2_xshut.value(0)
+            utime.sleep_us(TBOOT)
+            tofl1 = setup_tofl_device(i2c, 40000, 12, 8)
+            tofl1.set_address(0x33)
+        else:
+            print("Reconnect device 1")
+            device_1_xshut.value(1)
+            device_2_xshut.value(0)
+            utime.sleep_us(TBOOT)
+            tofl1 = setup_tofl_device(i2c, 40000, 12, 8, 0x33)
+
+        if (0x29 in addresses):
+            print("Now setting up device 2")
+            # Re-enable device 2 - on the same bus
+            device_1_xshut.value(1)
+            device_2_xshut.value(1)
+            utime.sleep_us(TBOOT)
+            tofl2 = setup_tofl_device(i2c, 40000, 12, 8)
+        else:
+            print("!!!!Fehler!!!")
+ 
+        g_dist_vl53l0x.append(tofl0)
+        g_dist_vl53l0x.append(tofl1)            
+        g_dist_vl53l0x.append(tofl2)
+        # perform initial dummy measurement and disregard as valued invalid 
+        tofl0.ping()
+        tofl1.ping()
+        tofl2.ping()            
+       
 
     # Depending on `core`, the thread that updates the hardware either runs
     # on the second core (`core` == 1) or on the same core as the main program
@@ -128,6 +190,10 @@ class Robot(object):
     if "tof_pwm" in cfg.DEVICES:
       for sens in g_dist_tof:
         sens.deinit()
+        
+    if "tof_vl53l0x" in cfg.DEVICES:
+        tofl0.set_address(0x29)
+        tofl1.set_address(0x29)       
 
     if g_state is not glb.STATE_OFF:
       glb.toLog("Powering down ...")
@@ -184,6 +250,12 @@ class Robot(object):
         _d[i] = int(tof.range_cm *10)
       self._last_dist = _d
       return _d
+    elif g_dist_vl53l0x:
+      _d = array.array("i", [0]*len(g_dist_vl53l0x))
+      for i, tof in enumerate(g_dist_vl53l0x):
+        _d[i] = int(tof.ping())-30
+      self._last_dist = _d
+      return _d    
     else:
       return []
 
@@ -243,6 +315,8 @@ class Robot(object):
         g_gui.show_distance_evo(self._last_dist)
       if g_dist_tof:
         g_gui.show_distance_tof(self._last_dist)
+      if g_dist_vl53l0x:
+        g_gui.show_distance_tof(self._last_dist)        
 
   def show_message(self, msg):
     """ Show a message on the display

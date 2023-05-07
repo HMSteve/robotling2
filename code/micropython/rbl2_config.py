@@ -38,7 +38,8 @@ SPO_TX         = board.D4
 SPO_SD         = board.D0
 
 # Servo-related definitions
-SRV_RANGE_US   = [(1110, 1810), (1100, 1800), (1291, 1565)]
+#SRV_RANGE_US   = [(1110, 1810), (1100, 1800), (1291, 1565)]
+SRV_RANGE_US   = [(1025, 1875), (1000, 1760), (1391, 1565)]
 SRV_RANGE_DEG  = [(-40, 40), (-40, 40), (-20, 20)]
 SRV_ID         = bytearray([0,1,2])
 SRV_PIN        = bytearray([board.D21, board.D10, board.D2])
@@ -55,7 +56,9 @@ PIMORONI_PICO_DISPLAY = const(1)
 
 # Devices
 # Value(s): "tof_pwm", "display"
-DEVICES        = ["tof_pwm", "display"]
+# DEVICES        = ["tof_pwm", "display"]
+DEVICES        = ["tof_vl53l0x", "display"]
+# DEVICES        = ["tof_none", "display"]
 DISPLAY_TYPE   = PIMORONI_PICO_DISPLAY
 
 # Pico Display-related definitions
@@ -72,6 +75,7 @@ BTN_Y_PIN      = const(15)
 STY_NONE       = const(0)
 STY_TOF        = const(1)
 STY_EVOMINI    = const(2)
+STY_VL53L0X    = const(3)
 
 # Pololu tof distance sensor array w/ PWM output
 TOFPWM_USE_PIO = False
@@ -93,6 +97,16 @@ EVOMINI_R_LOW  = const(0)
 EVOMINI_L_HIGH = const(1)
 EVOMINI_L_LOW  = const(2)
 EVOMINI_R_HIGH = const(3)
+
+# VL53L0X Time of flight sensor
+TOFL_I2C       = const(0)
+TOFL_SDA       = board.D0
+TOFL_SCL       = board.D1
+TOFL_SHUT_1    = board.D3
+TOFL_SHUT_2    = board.D22
+TOF_MAX_MM     = const(200)
+TOF_MIN_MM     = const(80)
+
 # pylint: enable=bad-whitespace
 
 # ----------------------------------------------------------------------------
