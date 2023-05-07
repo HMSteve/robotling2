@@ -104,8 +104,8 @@ TOFL_SDA       = board.D0
 TOFL_SCL       = board.D1
 TOFL_SHUT_1    = board.D3
 TOFL_SHUT_2    = board.D22
-TOF_MAX_MM     = const(200)
-TOF_MIN_MM     = const(80)
+TOF_MAX_MM     = const(300)
+TOF_MIN_MM     = const(10)
 
 # pylint: enable=bad-whitespace
 

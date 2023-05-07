@@ -9,13 +9,13 @@
 # 2022-02-12, v1.1
 # 2022-04-08, v1.2, a few improvements and fixes
 # ----------------------------------------------------------------------------
-import gc
 import time
 import random
 import rbl2_robot
 import rbl2_global as glb
 import rbl2_config as cfg
 from micropython import const
+
 
 # pylint: disable=bad-whitespace
 DIST_TOF_OBJ    = const(35)   # object if smaller than this distance
@@ -30,6 +30,8 @@ if __name__ == "__main__":
   Robot.autoupdate_gui = True
   only_sensors = False
   is_running = True
+  
+
 
   # Wait for user to start robot, if display with button available
   if is_gui and cfg.DISPLAY_TYPE in [cfg.PIMORONI_PICO_DISPLAY]:
@@ -83,12 +85,32 @@ if __name__ == "__main__":
       if only_sensors:
         # If only testing sensors, skip rest of main loop
         continue
+    
+      # evaluate button presses
+      if Robot.is_pressed_A:
+        dir = 1
+      elif Robot.is_pressed_B:
+        dir = -1
+      elif Robot.is_pressed_Y:
+         dir = 0        
+      elif Robot.is_pressed_X:
+        Robot.exit_requested = True
 
-      # Act on detected objects and/or cliffs
+      #glb.toLog("mem available: " + str(gc.mem_free()),"")
+      # Act on detected objects and/or cliffs and buttons
       if free:
-        if Robot.state is not glb.STATE_WALKING:
+        #glb.toLog(glb.STATE_STRS[Robot.state], "")
+        if Robot.state in [glb.STATE_WALKING, glb.STATE_REVERSING, glb.STATE_TURNING] and dir==0:
+          # move fwd first because stop doesn't work when reversing  
+          Robot.move_forward()             
+          Robot.stop()        
+        if Robot.state is not glb.STATE_WALKING and dir==1:
           Robot.move_forward()
           Robot.show_message("-")
+        if Robot.state is not glb.STATE_REVERSING and dir==-1:
+          Robot.move_backward()
+          
+          
       else:
         Robot.stop()
         while Robot.state is not glb.STATE_IDLE:

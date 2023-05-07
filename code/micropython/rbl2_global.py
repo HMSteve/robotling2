@@ -25,7 +25,7 @@ STATE_POWERING_DOWN = const(6)
 STATE_OFF           = const(7)
 # ...
 STATE_STRS          = ["None", "Idle",
-                       "Stopping", "Walking", "Backing up", "Turning",
+                       "Stopping", "Walking", "Reversing", "Turning",
                        "Powering down", "Off"]
 # Commands
 CMD_NONE            = const(0)

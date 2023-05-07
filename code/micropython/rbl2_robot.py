@@ -20,6 +20,8 @@ import rbl2_gui
 from robotling_lib.platform.rp2 import board_rp2 as board
 from vl53l0x import setup_tofl_device, TBOOT
 from robotling_lib.misc.helpers import timed_function
+import gc
+
 
 
 # pylint: disable=bad-whitespace
@@ -42,6 +44,7 @@ g_move_vel     = 2
 g_move_rev     = False
 g_do_exit      = False
 g_led          = Pin(board.D11, Pin.OUT)
+g_last_dist    = None
 # pylint: enable=bad-whitespace
 
 # ----------------------------------------------------------------------------
@@ -156,7 +159,7 @@ class Robot(object):
         g_dist_vl53l0x.append(tofl0)
         g_dist_vl53l0x.append(tofl1)            
         g_dist_vl53l0x.append(tofl2)
-        # perform initial dummy measurement and disregard as valued invalid 
+        # perform initial dummy measurement and disregard as values are invalid 
         tofl0.ping()
         tofl1.ping()
         tofl2.ping()            
@@ -233,6 +236,8 @@ class Robot(object):
     """ Returns the distances (in [mm]) as an array. The lengths of the array
         depends on the sensor: e.g. the TeraRanger Evo mini reports 4 values.
     """
+    global g_last_dist
+    
     if g_dist_evo:
       _d = array.array("i", g_dist_evo.distances)
       for i in range(len(_d)):
@@ -253,8 +258,9 @@ class Robot(object):
     elif g_dist_vl53l0x:
       _d = array.array("i", [0]*len(g_dist_vl53l0x))
       for i, tof in enumerate(g_dist_vl53l0x):
-        _d[i] = int(tof.ping())-30
+        _d[i] = int(tof.ping())-40 #TODO: check, why measured value is approx 40mm to high
       self._last_dist = _d
+      g_last_dist = self._last_dist
       return _d    
     else:
       return []
@@ -278,16 +284,21 @@ class Robot(object):
     """
     return self._user_abort
 
+  @exit_requested.setter
+  def exit_requested(self, val :bool):
+    self._user_abort = val 
+
   # GUI-related properties
   @property
   def autoupdate_gui(self):
     """ Endable/disable autoupdate of GUI during `sleep_ms`
     """
     return self._do_autoupdate_gui
+
   @autoupdate_gui.setter
   def autoupdate_gui(self, val :bool):
     self._do_autoupdate_gui = val if g_gui else False
-
+    
   @property
   def is_pressed_A(self):
     return g_gui._BtnA.is_pressed if g_gui else False
@@ -299,6 +310,11 @@ class Robot(object):
   @property
   def is_pressed_X(self):
     return g_gui._BtnX.is_pressed if g_gui else False
+
+  @property
+  def is_pressed_Y(self):
+    return g_gui._BtnY.is_pressed if g_gui else False
+
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   def update_display(self):
@@ -316,7 +332,7 @@ class Robot(object):
       if g_dist_tof:
         g_gui.show_distance_tof(self._last_dist)
       if g_dist_vl53l0x:
-        g_gui.show_distance_tof(self._last_dist)        
+        g_gui.show_distance_vl53l0x(self._last_dist)        
 
   def show_message(self, msg):
     """ Show a message on the display
@@ -397,11 +413,11 @@ class Robot(object):
 
         # Update
         self._spin_callback()
-        if self._do_autoupdate_gui:
-          self.update_display()
-        if self.is_pressed_X:
-          self._user_abort = True
-          return
+        #if self._do_autoupdate_gui:
+         # self.update_display()
+        #if self.is_pressed_X:
+         # self._user_abort = True
+         # return
         self._spin_t_last_ms = time.ticks_ms()
 
         # Check if sleep time is left ...
@@ -414,11 +430,11 @@ class Robot(object):
         while time.ticks_diff(time.ticks_us(), t_us) < (d_us -p_us):
           time.sleep_us(p_us)
           self._spin_callback()
-          if self._do_autoupdate_gui:
-            self.update_display()
-          if self.is_pressed_X:
-            self._user_abort = True
-            return
+          #if self._do_autoupdate_gui:
+          #  self.update_display()
+          #if self.is_pressed_X:
+          #  self._user_abort = True
+          #  return
 
         # Remember time of last update
         self._spin_t_last_ms = time.ticks_ms()
@@ -454,6 +470,7 @@ class Robot(object):
     global g_cmd, g_do_exit
     global g_move_dir, g_move_rev
     global g_dist_evo, g_led, g_gui
+
 
     if g_state == glb.STATE_OFF:
       return
@@ -496,6 +513,12 @@ class Robot(object):
       g_counter += 1
       g_led.value(0)
 
+      if self._do_autoupdate_gui:
+        self.update_display()
+      #if self.is_pressed_X:
+      #  self._user_abort = True
+      #  return
+
     else:
       # Finalize ...
       g_gait.deinit()
@@ -515,8 +538,10 @@ class Robot(object):
     global g_cmd, g_do_exit
     global g_move_dir, g_move_rev
     global g_dist_evo, g_led, g_gui
+    global g_last_dist
 
     # Loop
+    gc.threshold(80000)
     g_do_exit = False
     try:
       try:
@@ -524,6 +549,7 @@ class Robot(object):
 
         # Main loop ...
         while g_state is not glb.STATE_POWERING_DOWN:
+          glb.toLog("mem available: " + str(gc.mem_free()),"")
           g_led.value(1)
 
           # Handle new command, if any ...
@@ -561,6 +587,13 @@ class Robot(object):
             g_gui.spin()
           g_counter += 1
           g_led.value(0)
+
+          if g_gui and g_last_dist:
+            g_gui.show_distance_vl53l0x(g_last_dist)
+          if g_gui._BtnX.is_pressed:
+            g_do_exit = True
+            return
+                    
 
           # Wait for a little while
           time.sleep_ms(25)
